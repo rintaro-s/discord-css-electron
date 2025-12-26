@@ -1,0 +1,39 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+release/
+
+# Electron specific
+*.asar
+*.asar.unpacked
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+
+# VSCode settings
+.vscode/
+
+# Coverage reports
+coverage/
+
+# Squirrel installer logs
+SquirrelSetup.log
+SquirrelTemp/
+
+# Cache
+.cache/

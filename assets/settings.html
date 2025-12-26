@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';" />
+  <title>Siscord Theme Settings</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font: 13px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; padding: 16px; background: #111; color: #eee; overflow-y: auto; }
+    h1 { font-size: 16px; margin: 0 0 12px; }
+    h2 { font-size: 13px; margin: 12px 0 6px; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    button { padding: 6px 10px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #eee; cursor: pointer; }
+    button:hover { background: #222; }
+    select { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #eee; }
+    input[type="text"], input[type="color"] { padding: 6px 8px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #eee; }
+    .muted { color: #aaa; margin-top: 10px; font-size: 12px; }
+    .meta { margin-top: 10px; padding: 10px; border: 1px solid #333; border-radius: 8px; background: #151515; }
+    .meta div { margin: 2px 0; }
+    .spacer { height: 10px; }
+    .var-item { display: flex; gap: 8px; margin: 6px 0; align-items: center; }
+    .var-item label { flex: 0 0 140px; font-size: 12px; word-break: break-word; }
+    .var-item input { flex: 1; }
+    .var-item button { flex: 0 0 auto; }
+    #variables { max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 8px; border-radius: 6px; background: #0a0a0a; }
+  </style>
+</head>
+<body>
+  <h1>テーマ設定（外部）</h1>
+
+  <div class="row">
+    <button id="import">テーマをインポート</button>
+    <button id="refresh">再読み込み</button>
+  </div>
+
+  <div class="spacer"></div>
+
+  <label for="themes">有効テーマ</label>
+  <select id="themes"></select>
+
+  <div class="meta" id="meta" hidden></div>
+
+  <h2>テーマ変数のカスタマイズ</h2>
+  <div id="variables"></div>
+  <button id="saveVariables" style="margin-top: 8px;">変数を保存</button>
+  <button id="resetVariables" style="margin-top: 8px;">リセット</button>
+
+  <div class="muted">
+    Discord側の設定やクライアントには干渉せず、表示用CSSのみを注入します。
+  </div>
+
+  <script>
+    const themesEl = document.getElementById('themes');
+    const metaEl = document.getElementById('meta');
+    const importBtn = document.getElementById('import');
+    const refreshBtn = document.getElementById('refresh');
+
+    /** @type {Array<{filename: string, meta: {name?: string, description?: string, author?: string, version?: string}}>} */
+    let themes = [];
+
+    function setMeta(t) {
+      if (!t) {
+        metaEl.hidden = true;
+        metaEl.textContent = '';
+        return;
+      }
+      metaEl.hidden = false;
+      metaEl.innerHTML = '';
+      const lines = [
+        ['ファイル', t.filename],
+        ['名前', t.meta?.name || ''],
+        ['作者', t.meta?.author || ''],
+        ['バージョン', t.meta?.version || ''],
+        ['説明', t.meta?.description || ''],
+      ].filter(([,v]) => String(v).length);
+
+      for (const [k,v] of lines) {
+        const d = document.createElement('div');
+        d.textContent = `${k}: ${v}`;
+        metaEl.appendChild(d);
+      }
+    }
+
+    async function load() {
+      themes = await window.siscord.listThemes();
+      const active = await window.siscord.getActiveTheme();
+
+      themesEl.innerHTML = '';
+
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = '（無効）';
+      themesEl.appendChild(none);
+
+      for (const t of themes) {
+        const opt = document.createElement('option');
+        opt.value = t.filename;
+        opt.textContent = t.meta?.name ? `${t.meta.name} — ${t.filename}` : t.filename;
+        themesEl.appendChild(opt);
+      }
+
+      themesEl.value = active || '';
+      setMeta(themes.find(t => t.filename === active) || null);
+    }
+
+    themesEl.addEventListener('change', async () => {
+      const filename = themesEl.value || null;
+      await window.siscord.setActiveTheme(filename);
+      setMeta(themes.find(t => t.filename === filename) || null);
+      await loadThemeVariables(filename);
+    });
+
+    const variablesEl = document.getElementById('variables');
+    const saveVariablesBtn = document.getElementById('saveVariables');
+    const resetVariablesBtn = document.getElementById('resetVariables');
+
+    /** @type {Record<string, string>} */
+    let currentVariables = {};
+    let currentTheme = null;
+
+    async function loadThemeVariables(filename) {
+      currentTheme = filename;
+      currentVariables = {};
+      variablesEl.innerHTML = '';
+
+      if (!filename) {
+        variablesEl.innerHTML = '<p style="color: #aaa;">テーマを選択してください</p>';
+        return;
+      }
+
+      try {
+        const extracted = await window.siscord.extractThemeVariables(filename);
+        const saved = await window.siscord.getThemeVariables(filename);
+        currentVariables = {...extracted, ...saved};
+
+        if (Object.keys(currentVariables).length === 0) {
+          variablesEl.innerHTML = '<p style="color: #aaa;">カスタマイズ可能な変数がありません</p>';
+          return;
+        }
+
+        for (const [name, value] of Object.entries(currentVariables)) {
+          const item = document.createElement('div');
+          item.className = 'var-item';
+
+          const label = document.createElement('label');
+          label.textContent = name;
+          label.title = value;
+
+          const input = document.createElement('input');
+          input.type = value.includes('url(') || value.includes('#') ? 'text' : 'text';
+          input.value = value;
+          input.dataset.varName = name;
+          // Update currentVariables in real-time as user types
+          input.addEventListener('input', () => {
+            currentVariables[name] = input.value;
+            console.log('[Siscord UI] Variable updated:', name, '=', input.value);
+          });
+          // Also track on blur to ensure no loss
+          input.addEventListener('blur', () => {
+            currentVariables[name] = input.value;
+          });
+
+          item.appendChild(label);
+          item.appendChild(input);
+          variablesEl.appendChild(item);
+        }
+      } catch (e) {
+        console.error('Failed to load variables:', e);
+        variablesEl.innerHTML = '<p style="color: #f66;">エラーが発生しました</p>';
+      }
+    }
+
+    saveVariablesBtn.addEventListener('click', async () => {
+      if (!currentTheme) {
+        alert('テーマを選択してください');
+        return;
+      }
+      try {
+        console.log('[Siscord UI] Saving variables:', currentTheme, currentVariables);
+        await window.siscord.setThemeVariables(currentTheme, currentVariables);
+        alert('保存しました');
+      } catch (e) {
+        alert('保存に失敗: ' + String(e));
+      }
+    });
+
+    resetVariablesBtn.addEventListener('click', async () => {
+      if (!currentTheme) return;
+      try {
+        await window.siscord.setThemeVariables(currentTheme, {});
+        await loadThemeVariables(currentTheme);
+        alert('リセットしました');
+      } catch (e) {
+        alert('リセットに失敗: ' + String(e));
+      }
+    });
+
+    importBtn.addEventListener('click', async () => {
+      const res = await window.siscord.importTheme();
+      if (res?.importedFilename) {
+        await load();
+        themesEl.value = res.importedFilename;
+        await window.siscord.setActiveTheme(res.importedFilename);
+        setMeta(themes.find(t => t.filename === res.importedFilename) || null);
+        await loadThemeVariables(res.importedFilename);
+      }
+    });
+
+    refreshBtn.addEventListener('click', async () => {
+      await load();
+      await loadThemeVariables(currentTheme);
+    });
+
+    load();
+  </script>
+</body>
+</html>

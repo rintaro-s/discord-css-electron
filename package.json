@@ -1,0 +1,23 @@
+{
+  "name": "siscord",
+  "private": true,
+  "version": "0.1.0",
+  "description": "External Discord wrapper that only injects theme CSS (BetterDiscord-compatible).",
+  "main": "electron.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsc -w --preserveWatchOutput",
+    "start": "npm run build && electron .",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package-win": "electron-packager . Siscord --platform=win32 --arch=x64 --out=release --overwrite --prune=true --ignore=node_modules/electron*"
+  },
+  "dependencies": {
+    "electron": "^32.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "electron-packager": "^17.1.0"
+  }
+}
