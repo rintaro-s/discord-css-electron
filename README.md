@@ -7,6 +7,9 @@ Discord を「ブラウザとして」開き、外部から **CSS（テーマ）
 - BetterDiscord のようなプラグイン機構は持ちません
 - 注入は `webContents.insertCSS` による CSS のみ（JS は注入しません）
 
+<img width="2553" height="1339" alt="project_1766717080" src="https://github.com/user-attachments/assets/f27adae7-75f2-498d-8f8f-47020e427722" />
+
+
 ## テーマ互換
 
 BetterDiscord 互換のテーマファイル（`.theme.css` / `.css`）をインポートできます。
@@ -32,4 +35,5 @@ npm run start
 
 テーマはOSのユーザーデータ配下に保存します（アプリが自動作成）。
 - Windows: `%APPDATA%/Siscord/themes`
+
 
